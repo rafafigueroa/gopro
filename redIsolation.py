@@ -21,12 +21,16 @@ while True:
 	imgraw = base64.decodestring(imgstr)
 	pilImage = Image.open(StringIO.StringIO(imgraw));
 	frame = np.array(pilImage)
-	bwframe = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-	edges = cv2.Canny(bwframe, 100, 100)
+	hsv = cv2.cvtColor(frame , cv2.COLOR_BGR2HSV)
 
-
+	red = np.uint8([[0,0,255]])	
+	lower_red = np.array([0, 100, 100])
+	upper_red = np.array([40, 255, 255])
+	mask = cv2.inRange(hsv, lower_red, upper_red)
+	res = cv2.bitwise_and(frame, frame, mask = mask)
 	cv2.imshow('frame', frame)
-	cv2.imshow('edges', edges)
+	cv2.imshow('mask', mask)
+	cv2.imshow('res', res)
 
 	#matImage = cv.fromarray(npImage)
 	cv2.waitKey(1)
