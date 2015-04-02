@@ -45,4 +45,10 @@ A.~Shrestha and M.~Brechtelsbauer, ``Transportable optical ground station for
   Engineering+ Applications}.\hskip 1em plus 0.5em minus 0.4em\relax
   International Society for Optics and Photonics, 2012, pp. 851\,706--851\,706.
 
+\bibitem{goprohero}
+\BIBentryALTinterwordspacing
+J.~Villbrandt. Go{P}ro{H}ero driver. [Online]. Available:
+  \url{https://github.com/joshvillbrandt/goprohero}
+\BIBentrySTDinterwordspacing
+
 \end{thebibliography}
