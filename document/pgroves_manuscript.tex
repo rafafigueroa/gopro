@@ -1,0 +1,341 @@
+\documentclass[letterpaper, 12pt]{article}
+\newcommand{\shellcmd}[2]{\texttt{\large{#1}\$ {#2}\\}}
+\usepackage[english]{babel} % for languages
+\usepackage{graphicx} 
+\usepackage{epstopdf}
+\usepackage[caption=false]{subfig}
+\usepackage[left=0.625in,top=0.75in,right=0.625in,bottom=1.00in]{geometry} %according to the guidelines
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amsxtra}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{bm}
+\usepackage{xspace}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{color,soul}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{siunitx}
+%&&&&&&&&&&&&& Commands &&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+\renewcommand{\algorithmicrequire}{\textbf{Input:}}
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
+\renewcommand{\algorithmiccomment}[1]{$\rhd$ #1}
+\newcommand{\ie}{{\it i.e.},\xspace}
+\newcommand{\eg}{{\it e.g.},\xspace}
+\newcommand{\cf}{{\it c.f.},\xspace}
+\newcommand{\el}{{\it et al.},\xspace}
+\newcommand{\etc}{\text{etc.}}
+\def \marhes{{\sc Marhes~}}
+%&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+\DeclareFontFamily{OT1}{pzc}{}
+\DeclareFontShape{OT1}{pzc}{m}{it}%
+              {<-> s * [1.200] pzcmi7t}{}
+\DeclareMathAlphabet{\mathpzc}{OT1}{pzc}%
+                                 {m}{it}
+\newcommand{\excise}[1]{}
+\newcommand{\NOTE}[1]{{\bf NOTE: {#1}}}
+
+\begin{document}
+
+\title{\Large \textbf {New Quadrotor control platform usng the Intel Edison board}}
+\author{Rafael Figueroa}
+\date{\today}
+
+\maketitle
+
+\section{Introduction}
+\section{Intel Edison}
+The main board controlling the quadrotor will be the Intel Edison. A powerful, small and lightweight embedded system. It has a special connector which allows for a connection in series through the I$^2$C port.
+
+\subsection{Edison Setup}
+The official embedded system distribution for the Intel Edison is the Linux Yocto. However, it suffers from being an on-demand build system, basically a specific image with desired packages needs to be created and installed into the Intel Edison. This would work for the last step on a development process, however it is not ideal for research and initial development.\\
+
+A different Linux distribution was installed in the Intel Edison. The one chosen in the ubilinux embedded Linux distribution from Emutex\cite{ubilinux}, this distribution is based on Debian ``Wheezy''.\\
+
+The ubilinux distribution provides an advanced package manager with pre-built binaries as found in the Debian distribution (from which Ubuntu was also based). A basic user named ``rafa'' was created with sudo capacity. The wireless setup was done and tested, currently each wireless network need to be written in the configuration files. Basic instructions can be found at \cite{edison_setup}.\\
+
+For a ground station computer connected via mini-USB cable to the Intel Edison, the Intel Edison can be accessed by using the following command:\\
+
+\shellcmd{\bf$\sim$}{sudo screen /dev/ttyUSB0 115200}\\
+
+The Intel Edison interface is command line only, no graphical interface or desktop. At the blinking cursor, press enter to login.
+
+To connect the Edison to a wireless network, modify the wpa login/pswd by:\\
+
+\shellcmd{\bf$\sim$}{sudo vim /etc/network/interfaces}\\
+
+\section{3DR Drone Specifications}
+The quadrotor or drone is a product of 3D Robotics or 3DR, from their DIY Quad Kit. It has the following parts.
+
+\subsection{Motors}
+The motors are the RCX or RCX Hobby A-2830/12 850kV Outrunner Brushless Motor. Specificification from \cite{motor_specs}.\\
+
+\noindent Model:  RCX A2830-12\\
+Weight: 52g\\
+KV(rpm/V): 850 kV \small{Note: No Torque}\\
+Max Power: 187W\\
+Max Current: 12.9A\\
+Max Pull (Approx.): 875g\\
+Ri(M $\Omega$ ) 0.136\\
+
+At no torque, the motor should provide 850 rpm/V. For a full battery, approximately at 12V, the motor should run at approximately 10000 rpm.
+
+\subsection{Propellers}
+The propellers are the APC Propellers 10 x 4.7 slow-fly model and slow-fly pusher model, which refers to 10 inches in length and 4.7 inches per revolution pitch. There are 2 models being used due that in a quadrotor a pair of propellers rotates in opposite direction of the other pair. Full performance data available at \cite{propeller_data} with testing methodology and details available at \cite{propeller_thesis}.
+
+The main characteristics are:
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[scale = 0.4]{figures/propeller_basic_Ct_static.png}
+    \caption{Propeller Thrust Static Performance \cite{propeller_thesis}}
+    \label{fig:propeller_summary} 
+\end{figure}
+
+\begin{center}
+    \begin{tabular}{l l}
+        $\omega$ (rpm) & $C_T$ \\
+        \hline
+        2377 & 0.1039 \\
+        2676 & 0.1058 \\
+ 2947 & 0.1059 \\
+ 3234 & 0.1083 \\
+ 3494 & 0.1096 \\
+ 3762 & 0.1121 \\
+ 4029 & 0.1136 \\
+ 4319 & 0.1155 \\
+ 4590 & 0.1177 \\
+ 4880 & 0.1199 \\
+ 5147 & 0.1213 \\
+ 5417 & 0.1228 \\
+ 5715 & 0.1239 \\
+ 5960 & 0.1253 \\
+ 6226 & 0.1261 \\
+ 6528 & 0.1274 \\
+    \end{tabular}
+\end{center}
+
+
+True Diameter: $\SI{25.40}{\centi\meter}$ \cite{propeller_thesis}\\
+$C_T$: 0.1136 at 4029 rpm with static quadrotor.
+
+\subsection{Electronic Speed Controllers}
+The Electronic Speed Controllers (ESC) used are the RCTimer 30A Brushless Motor Speed Controller.  With specifications from \cite{ESC_specs}:\\
+
+\noindent Input voltage: DC 6-16.8V(2-4S Lixx)\\
+BEC: 5V  2amp\\
+Running current: 30A (Output:  Continuous 30A, Burst 40A up to 10 Secs.)\\
+Size: 36mm (L) * 26mm (W) * 7mm (H).\\
+Weight: 32g.\\
+
+\section{ESC Firmware Installation} \label{sec:simonk}
+
+The ESC comes programmed to be used directly with a remote control. A new firmware was installed allows for direct modification of the controller code. The firmware is open source and available at \cite{simonk}. The most updated list showing the compatibility of models and firmware available is \cite{esc_list}. For this particular model, the information compiled is:
+
+\noindent Microcontroller Unit: Atmega
+Pads: Row Configuration
+External Oscillator: No
+FETs: P/N (Mixed type P and type N transistors)
+File: tgy.hex (Hexadecimal file with the compatible firmware)
+
+The list also included photos of the ESC which correspond to the electronics ESCs used for this project after the wrapping is removed. The company which included this ESCs in the drone (3DR) did not include the RCTimer branding, for which proper product identification was a critical step.
+
+A demonstration of the faster response provided by using SimonK Firmware is available at \cite{simonk_demo}
+
+In order to install the SimonK firmware into the ESC Microcontroller, a special programmer device is needed. I used the USBASP AVR Programmer from protostack \cite{avr_prog}.
+
+\section{I$^2$C Setup}
+
+For I$^2$C connection and interfacing with command line, development tools such as i2c-tools and python-smbus where installed. The connection was setup using a modified version of \cite{i2cpython}. Once the I$^2$C connection was completed,  the sensor connection can be verified with:\\
+
+\shellcmd{\bf$\sim$}{sudo i2cdetect -y -r 1}\\
+
+With the base breakout board, IMU and PWM blocks, my output is shown in Figure \ref{fig:i2cdetect_output}, where the address of the IMU is 1Dh and 6Bh and the address of the PWM Controller is 40h.\\
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[scale = 0.7]{figures/i2cdetectoutput.png}
+    \caption{i2cdetect output}
+    \label{fig:i2cdetect_output} 
+\end{figure}
+
+\section{Sensors}
+
+\subsection{Inertial Measuring Unit}
+
+The Inertial Measuring Unit (IMU) is the 9 Degrees of Freedom LSM9DS0\cite{imu_datasheet}. The unit is installed on a separate board or Sparkfun ``block'' DEV-13033. It includes:
+
+\begin{itemize}
+ \item 3-axis accelerometer.
+ \item 3-axis gyroscope.
+ \item 3-axis magnetometer.
+\end{itemize}
+
+The IMU drivers \cite{imu_driver} were used to interface with this sensor.
+%TODO: driver usage details
+
+\subsection{PWM Setup}
+The quadrotor Electronic Speed Controller (ESC) require a PWM signal as input. The Sparkfun PWM Block for the Intel Edison is used to generate this signal. The block has a PCA9685 PWM controller \cite{pwm_controller} with an independent clock. The communication is done using the I$^2$C connection. In Figure \ref{fig:i2cdetect_output}, the address to control the pwm values is at 40h.
+
+The drivers used to handle the low level communication with the device are a modified version of \cite{pwm_driver}, with adapted instructions from \cite{pwm_driver_instructions}. The drivers were first tested using a standard servo motor with good results.
+
+From section \ref{sec:simonk}, the ESCs firmware will be using SimonK firmware. From the assembly code to the ESC, the following parameters can be set:\\
+
+\noindent $1060\mu s =$  Stop motor at or below this pulse length \\
+$1860\mu s =$  Full speed at or above this pulse length.\\
+
+Those values are used for this project. A constant period of the PWM signal is used, with a frequency of 400Hz which accommodates the longest pulse width needed. In this case the period of the signal will be $1s/400 = 2500\mu s$. However the PWM driver takes values between 0 and 4096 which corresponds to the range 0\% to 100\% of the pulse width inside the fixed period. The actual values sent to the controller follow the following equation:
+
+\begin{align}
+servo\_pulse\_command = \frac{pw}{2500 \mu s}, 
+\end{align}
+
+where $pw$ is the width of the pulse between $1060 \mu s$ (stop) and $1860 \mu s$ (full throttle). These settings were first tested by using an oscilloscope connected to the PWM controller output, resulting in Figures \ref{fig:low_pwm_test} and \ref{fig:high_pwm_test}. The actual resulting period was of approximately $2360\mu s$ instead of the expected $2500 \mu s$ however the values of the pulse widths are within acceptable ranges. Additional adjusting needs to be done during the calibration phase.
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[scale = 0.08]{figures/low_pwm_test.jpg}
+    \caption{Low pulse width test, $1060 \mu s$ target}
+    \label{fig:low_pwm_test} 
+\end{figure}
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[scale = 0.08]{figures/high_pwm_test.jpg}
+    \caption{High pulse width test, $1860 \mu s$ target}
+    \label{fig:high_pwm_test} 
+\end{figure}
+
+The values where tested directly on the motors using the DT2234A Digital Laser Photo Tachometer. The motor started rotating at a constant speed around 2400 rpm and the relationship between the pulse width used and the rpm output was not exactly linear. With fixed frequency of 400Hz, measurement points were taken from 3000 to 8000 rpm every 1000 rpm. The pulse width of the PWM signal was varied by hand using a Python script until the tachometer read the expected angular velocity. The values were stored using the 0 to 4096 parametrization of the pulse width. A second-order polynomial fit approximation will be used in the control law, with coefficients calculated form this calibration process. Figure \ref{fig:rpm_pwm} shows the test points and fitting curve. 
+
+\begin{figure}[!htb]
+    \centering
+    \includegraphics[scale = 0.8] {figures/MotorPWMtoRPM.png}
+    \caption{RPM values to Pulse Width Parameter Characterization}
+    \label{fig:rpm_pwm}
+\end{figure}
+
+
+
+\section{System Model}\label{sec:model}
+
+\subsection{Quadrotor Dynamics}\label{sec:ref_quad_model}
+The quadrotor dynamics from \cite{quadrotor_model}
+
+The world coordinate frame is denoted $\lbrace\mathpzc{W}\rbrace$, the body-fixed frame $\lbrace\mathpzc{Q}\rbrace$ is attached to the center of mass of the quadrotor. 
+
+\subsubsection{Thrust}\label{sec:thrust}
+
+The thrust on a propeller is based on the following equation\cite{uav_handbook}\cite{propeller_thesis}:
+\begin{align}
+ T_i &= C_T \rho D^4 \omega_i^2
+\end{align}
+
+or
+
+\begin{align}
+ C_T &= \frac{T_i}{\rho D^4 \omega_i^2}
+\end{align}
+
+
+Where $T_i$ is the upwards thrust in rotor $i$, $C_T$ is the rotor thrust coefficient, $\rho = \SI{1.204}{\kilo\gram/m^3}$ is the air density $D$ is the propeller diameter and $\omega_i$ is the angular velocity of rotor $i$. 
+
+The angular velocity corresponding with ideal hovering corresponds to:
+\begin{align}
+\sum\limits_{i=1}^{4} T_i &= m g
+\end{align}
+
+Where $T$ is the sum of the individual motor thrusts, so that:
+\begin{align}
+ \sum\limits_{i=1}^{4} T_i &= T_1 + T_2 + T_3 + T_4 = 4 T_h\\
+ T_h &= \frac{m g}{4}\\
+ T_h &= b {\omega_h}^2\\
+ \omega_h &= \sqrt{\frac{m g}{4 b}}\\
+ \omega_h &\approx \sqrt{\frac{\SI{1.2}{\kilo\gram}\ \SI{9.81}{\meter/\second^2}}{4 b}}
+\end{align}
+
+With $b = C_T \rho D^4$,
+\begin{align} 
+ b &= C_T\ \SI{1.116}{\kilo\gram/\meter^3} * (\SI{0.254}{\meter})^4 \\
+ b &= C_T\ 0.00464514\ \SI{}{\kilo\gram\meter} \\
+ b &= C_T\ \ \frac{\SI{}{\newton}}{\SI{}{rps^2}} \times \left(\frac{1\ rps}{60\ rpm} \right)^2\\
+ b &= C_T\ 1.29031742 \times 10^{-6} \frac{\SI{}{\newton}}{rpm^2}
+\end{align}
+
+For $C_T \approx 0.11$,
+\begin{align}
+ b &= 1.42934916 \times 10^{-7} \frac{\SI{}{\newton}}{rpm^2}\\
+  \omega_h &\approx \sqrt{\frac{\SI{1.2}{\kilo\gram}\ \SI{9.81}{\meter/\second^2}}{4 \times 1.42934916 \times 10^{-7} \frac{\SI{}{\newton}}{rpm^2}}}\\
+  \omega_h &\approx 4553\ rpm\\
+\end{align}
+
+
+Air density corrected by Albuquerque conditions. 
+
+The model of the quadrotor is done as one system using Lagrangian mechanics. The model for the quadrotor was done using the yaw-pitch-roll rotation convention. The Generalized coordinates is given by:
+\begin{align}
+\mathbf{q} = \left[x\,\,y\,\,z\,\,\theta_x\,\,\theta_y\,\,\theta_z\,\right]^\mathit{T}
+\label{eq:gen_pos_vector}
+\end{align}
+
+where
+\begin{center}
+	\begin{tabular}{l l}
+		$\mathbf{P_q}=\left[x\,\,y\,\,z\right]^\mathit{T} \in \mathbb{R}^3$ & is the position of the quadrotor center of mass respect to $\lbrace\mathpzc{W}\rbrace$,\\
+		$\left[\theta_x\,\,\theta_y\,\,\theta_z\right]^\mathit{T} \in \mathbb{R}^3$ & are the Euler angles defining the rotation of $\lbrace\mathpzc{Q}\rbrace$ with respect to $\lbrace\mathpzc{W}\rbrace$,\\
+	\end{tabular}
+\end{center}
+
+The total kinetic energy is denoted by $\mathit{K}$ and the total potential energy by $\mathit{U}$.
+\begin{align}
+\mathit{K} &=\frac{1}{2}M\mathbf{\dot{P_q}}^T\mathbf{\dot{P_q}}+\frac{1}{2}\mathbf{\Omega}^T\mathbf{J}\mathbf{\Omega}\\\
+\mathit{U} &=Mgz\\
+\end{align}
+where
+\begin{center}
+	\begin{tabular}{l p{5.775cm}}
+		$m \in \mathbb{R}$ & is the mass of the quadrotor,\\
+		$g \in \mathbb{R}$ & is the constant gravitational acceleration,\\
+		$\mathbf{J} \in \mathbb{R}^{3\times3}$ & is the quadrotor constant inertia matrix expressed in $\lbrace\mathpzc{Q}\rbrace$,\\
+		$\mathbf\Omega \in \mathbb{R}^3$ & is the rotation rates of $\lbrace\mathpzc{Q}\rbrace$ with respect to its own axes matching the quadrotor inertia matrix $\mathbf{J} $,\\
+	\end{tabular}
+\end{center}
+The angular velocity $\mathbf{\dot{\eta}} \in \mathbb{R}^3$ of $\lbrace\mathpzc{Q}\rbrace$ with respect to $\lbrace\mathpzc{W}\rbrace$ or $[\dot{\theta_x}\,\,\dot{\theta_y}\,\,\dot{\theta_z}]^\mathit{T}$ is related to $\mathbf\Omega$ following the standard kinematic relationship \cite{Corke_Springer_2011}.
+
+\begin{align}
+	\begin{bmatrix}
+	\dot{\eta_x} \\ \dot{\eta_y} \\ \dot{\eta_z}
+  \end{bmatrix} &= 
+  	\begin{bmatrix}
+	\cos\theta_y\cos\theta_x &-\sin\theta_x &0 \\
+    \cos\theta_y\sin\theta_x &\cos\theta_x &0 \\
+    -\sin\theta_y &0 &1
+  \end{bmatrix} 
+	\begin{bmatrix}
+	\dot{\theta_x} \\ \dot{\theta_y} \\ \dot{\theta_z}
+  \end{bmatrix}
+\label{eq:standard_kinematic_relationship}
+\end{align}
+
+The energy of the system can be described in terms of the Generalized coordinates \ref{eq:gen_pos_vector} and its derivatives, allowing for the formulation of the Lagrangian equation and its associated Generalized equations of motion:
+\begin{align}
+\mathcal{L} &= \mathit{K} + \mathit{U}\\
+\mathbf{F} &= \frac{d}{dt}\left(\frac{\partial{\mathcal{L}}}{\partial{\dot{\mathbf{q}}}} \right) - \left(\frac{\partial{\mathcal{L}}}{\partial{\mathbf{q}}} \right) 
+\label{eq:Lagrangian}
+\end{align}
+
+Where the Generalized forces vector $\mathbf{F} \in \mathbb{R}^6$ contains the actuating forces on the respective Generalized coordinates.  Then, the Generalized forces vector can be separated as $\mathbf{F} = [\mathbf{F_{cartesian}} \,\, \mathbf{F_{angular}}]^T$ for which the forces on the quadrotor can be expressed as \cite{Corke_Springer_2011} using the yaw-pitch-roll rotation convention:
+\begin{align}
+\mathbf{F_{cartesian}} &= \mathbf{R_z}(\theta_z) \mathbf{R_y}(\theta_y)  \mathbf{R_x}(\theta_x)[0\,\,0\,\, T]^T \\
+\mathbf{F_{angular}} &=  [\tau_x \,\, \tau_y \,\, \tau_z]^T
+\label{eq:Quadrotor Forces}
+\end{align}
+
+Where $T$ is the total thrust created by the quadrotor's rotors and $\tau_x$, $\tau_y$ and $\tau_z$ are the respective torques in the quadrotor coordinate frame $\lbrace\mathpzc{Q}\rbrace$.
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{ref_IP}
+
+\end{document}
