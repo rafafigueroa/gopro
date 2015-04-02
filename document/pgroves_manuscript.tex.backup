@@ -94,26 +94,12 @@ The laser communication module in the sender robot is commanded with finding a t
 
 \subsection*{Stage 2: Reciprocal Alignment}
 
-If the target robot has an actuated laser communication module, it will use it to point its sensor in the direction of the sender robot. If the target robot does not have an actuated laser communication module, their trajectories might be affected in order to perform the alignment. 
+If the target robot has an actuated laser communication module, it will use it to point its sensor in the direction of the sender robot. If the target robot does not have an actuated laser communication module, their traject 
 
-\subsection*{Stage 3: Precise Laser-Sensor Alignment}
-
-Once the tracking and base laser-sensor alignment are completed, a precise alignment phase is completed which includes turning the laser on and receiving a visual feedback from the target robot. In the prototype developed, the visual feedback is given by a LED that turns on when the precise alignment has been accomplished measured by the intensity of the laser on the sensor. Depending on the terrain conditions and smoothness of the robot trajectories, the robots might need to stop for the duration of the message to ensure a consistent alignment.
-
-\subsection*{Stage 4: Message Sending}
-
-The message is sent using the laser-sensor pair. Once properly aligned and started, the input of the laser and the output of the sensor will behave like a physical cable while the signal is within the capabilities of the driver and sensor. As the baud rate increases, the error on the message interpretation is increased.
-
-\subsection*{Stage 5: Acknowledgment}
-
-After the message is received, the target robot acknowledges by using the wireless network and the robots continue with their mission.
-
-\section*{Prototype Hardware}\label{chp:}
+\section*{Hardware}\label{chp:}
 
 %\prototype
-
-\subsection*{Alignment Actuator System}
-The platform designed incorporates a gimbal system designed and built in house. It uses DC motors connected to an on-board motor PWM (Pulse Width Modulation) driver and H-Bridge. The  can utilize USB or wireless cameras to perform computer vision tasks for the purpose of laser alignment and target acquisition. (one  or two sentences on multi robots in marhes here) In addition the laser system is connected in a modular fashion to allow the inclusion of both a laser and receiver for bidirectional communications, or just the receiver for a receive only mode. This gives an operational envelope, in terms of power requirements and weight, that will cover all four platforms present in the Marhes lab.
+The platform being designed incorporates a Gimbel system designed and built in house. It uses inexpensive DC motors connected to an on-board processor. The (MCU?) processor can utilize USB or wireless cameras to perform computer vision tasks for the purpose of laser alignment and target acquisition. (one  or two sentences on multi robots in marhes here) In addition the laser system is connected in a modular fashion to allow the inclusion of both a laser and receiver for bidirectional communications, or just the receiver for a receive only mode. This gives an operational envelope, in terms of power requirements and weight, that will cover all four platforms present in the Marhes lab.
 Methodology
 Hardware
 Gimbel System
