@@ -1,0 +1,157 @@
+% Example template for using the unmeethesis style
+% This example is for a Master's candidate in Mathematics
+% It contains examples of front matter and most sections that the
+% typical graduate student would need to include
+% By: N. Doren 02/10/00
+%     Minor mods by N. Doren 08/26/11
+
+% Use the following specification for BOTTOM page numbering:
+\documentclass[botnum, fleqn]{unmeethesis}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amsxtra}
+\usepackage{amssymb}
+\usepackage{mathrsfs}
+\usepackage{bm}
+\usepackage{xspace}
+\usepackage{graphicx}
+\usepackage{epstopdf}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{url}
+\usepackage{color,soul}
+\usepackage{float}
+\usepackage{listings}
+% Use the following specification for TOP page numbering:
+% \documentclass[fleqn]{unmeethesis}
+\def \marhes{{\sc Marhes~}}
+
+\begin{document}
+
+\frontmatter
+\title{Automatic Targeting, Point-to-Point Laser Communication System for small robots}
+\author{Paul Groves}
+\degreesubject{M.S., Electrical Engineering}
+\degree{Master of Science \\ Electrical Engineering}
+\documenttype{Project}
+\previousdegrees{B.S., Computer Engineer, University of New Mexico, 2012}
+\date{May, 2105}
+\maketitle
+\makecopyright
+\maketitleabstract %(required even though there's no abstract title anymore)
+
+\begin{abstract}
+There is a need for secure point-to-point communication between robots. The purpose of this project is to create a system to allow secure, point-to-point, laser communication between the pairs of robots. The use of lasers to communicate the message will guarantee that only an agent on the laser's path will be able to intercept the communication under most operating conditions. The system will be designed to be modular in order to be customized to the robot capabilities. A prototype that includes an automatic identification and targeting system is developed and demonstrated. 
+
+\end{abstract}
+
+%\tableofcontents
+%\listoffigures
+%\listoftables
+\mainmatter
+\section*{Introduction} \label{chp:introduction}
+Wireless communications system are notoriously easy to eavesdrop on. For instance, for home networks the most advanced encryption techniques can be defeated with easily attainable tools \cite{wireless_vulnerabilities}.  When more robust encryption and security techniques are used, such as military applications, just the act of transmitting over radio waves can give valuable information to an attacker, such as the location of the transmitter\cite{wireless_triangulation}.
+
+Laser communications are inherently point-to-point, the message being transmitted can only be read when an agent is in the laser's path, significantly reducing possible attack vectors. Laser systems have been used for point-to-point communications, for example in \cite{nasa_laser}\cite{transportable_laser}. However, these systems use large, specialized, lasers and actuators. The goal of this project is to develop a system that will allow two agents to communicate over a laser beam in the lab, using off the shelve components fitted to the robot's size and load capacity.
+
+The  \marhes Lab specializes in small, autonomous, ground and air based mobile robots. The current systems include Turtlebots from Clearpath Robotics, Octoroaches developed at UC Berkely, a “Panzer” unit developed in the \marhes Lab, and Quadrotors from AscTek Inc. The laser communication system and prototype are focused on these robots. Smaller robots, such as the Octoroach, will have only a laser receiver module; while larger robots, like the Turtlebot, will have a laser module capable of sending and receiving a message.
+\clearpage
+
+\section*{System Overview}
+
+A laser communication module will consist of the following components:
+
+\begin{itemize}
+ \item Microcontroller Unit (MCU).
+ \item Laser sensor.
+ \item Laser and laser driver circuit.
+ \item Camera.
+ \item Alignment actuators.
+\end{itemize}
+
+Only the first two items will be required regardless of robot size. Each robot capable of sending a message will have the laser and camera mounted on an actuated gimbal in order to find and track the target module without affecting the sender robot current trajectory or mission.
+
+In this project, I consider a case where a group of robots have a wireless channel for low security communication and a secure message needs to be transmitted between two robots in the network. The process will follow these general steps:
+
+\begin{itemize}
+ \item \textbf{Stage 0:}\\ Sender robot communicates its intention to send a secure message to the target robot.
+ \item \textbf{Stage 1:}\\ Sender robot commands laser communication module to find and track the target robot.
+ \item \textbf{Stage 2:}\\ If equipped, the target robot commands laser communication module to find and track the sender robot.
+ \item \textbf{Stage 3:}\\ The laser communication module on the sender robot performs precise alignment of its laser with the target's laser sensor.
+ \item \textbf{Stage 4:}\\ The laser communication module on the sender robot sends the message.
+ \item \textbf{Stage 5:}\\ Target robot acknowledges message receipt.
+\end{itemize}
+
+\subsection*{Stage 0: Preparation}
+
+Due that the robots will need to align their laser communication modules before the modules can be used effectively, their wireless network channel is used to perform this initial handshaking. After the modules find and identify each other, the operation is handled entirely by the laser communication modules. The initial handshaking could include relative position information to hasten the next stage.
+
+\subsection*{Stage 1: Automatic Targeting and Identification}
+
+Each laser communication module is capable of showing a unique visual pattern which identifies it in the group. For an added measure of security, the pattern can be changed during operation. In the prototype developed, the visual pattern is adjusted using LEDs.
+
+The laser communication module in the sender robot is commanded with finding a target pattern, which does by using computer vision. Once the target is identified, the laser communication actuators will continuously track the target robot until the secure communication is completed. 
+
+\subsection*{Stage 2: Reciprocal Alignment}
+
+If the target robot has an actuated laser communication module, it will use it to point its sensor in the direction of the sender robot. If the target robot does not have an actuated laser communication module, their traject 
+
+\section*{Hardware}\label{chp:}
+
+%\prototype
+The platform being designed incorporates a Gimbel system designed and built in house. It uses inexpensive DC motors connected to an on-board processor. The (MCU?) processor can utilize USB or wireless cameras to perform computer vision tasks for the purpose of laser alignment and target acquisition. (one  or two sentences on multi robots in marhes here) In addition the laser system is connected in a modular fashion to allow the inclusion of both a laser and receiver for bidirectional communications, or just the receiver for a receive only mode. This gives an operational envelope, in terms of power requirements and weight, that will cover all four platforms present in the Marhes lab.
+Methodology
+Hardware
+Gimbel System
+The Gimbel System is composed of two DC motors on an aluminum frame. The top motor {figure blah} allows a full 360 degree rotation about the Z axis. The electronics housed in the Central unit consist of the Camera, the Laser, a photodiode receiver, a Signal Good LED, and a cluster of 4 LEDS used for identification. The side motor allows for a +/- 15 Degree rotation about the X axis. 
+The motors are Polulu Micro Metal DC motors with a gear ration of 150:1. They are driven by a Polulu Junior blah dual DC motor driver. The driver is controlled through a serial port using the standard Polulu command set {appendix blah}. It is capable of delivering 2.5A of continuous current at voltages from 5V up to 24V. They are operated at 12V for improved torque. 
+Laser and Receiver
+The current laser operates in the 450 nM wavelength and is a standard laser pointer type. It is powered from 5 volts DC through transistor J? {Figure blah}. Since it is always active in the current design it provides a means of visible confirmation during testing. 
+The photodiode was selected to match the wavelength of the laser. When the laser strikes the photodiode current flows through it and into the input of the OpAmp J blah at pin blah {figure}. If sufficient current is allowed to pass through to drive the voltage at the pin above the negative input then opamp output will be pulled high. The threshold voltage is selectable by adjusting the pot P1. 
+The Signal Good indicator, LED 1, is tied to the output pin {blah} of J?. Once the output pin blah goes high in response to the photodiode pin going above the noise threshold the opamp allows current to flow through the LED to ground.
+The output from the opamp currently goes directly to the CPU. The voltage level is selectable by the pullup voltage at the output pin. In the future this may be tied to a PPM or other type of modulation circuitry if desired. 
+CPU (MCU?)
+The CPU being used is an Intel Edison module. The Edison platform has a dual core 500 MHz atom processor, 1 GB of on board memory, and 4 GB of storage. In addition it includes WiFi, Bluetooth, a USB port for power and to provide a console port, and a USB OTG port. 
+Camera
+The current camera being used for development is a GoPro Hero3+. It is a Wifi camera capable of full HDMI resolution with a 90 FOV. 
+Software
+Algorithm
+The algorithm under design needs to accomplish several tasks. It must identify a target in the image returned by the camera. It must be able to align the target to the center of the image. And it must then be able to align the laser with the receiver on the target. The algorithm developed allows the hosting agent to command the Laser Communications Module to align the laser onto the targets receiver and send a message over the link.
+Results
+System Configuration
+Linux 3.2 OS
+The Edison operates on a Debian 3.2 Headless kernel built from the Yocto project. It includes special libraries from Intel to support access to the extra features of the platform, such as GPIO ports and ADC ports. 
+Python Version Blah
+Python is a scripting language developed by Blah in <year>. It is a very poplular scripting language that is portable and easy to use. Python <version> was used in this project. The following commands install Python and required Python libraries.
+Git python
+Git blah…
+%<screen shot?>
+OpenCV 2.blah
+OpenCV is a mature, robust, computer vision library available to the Open Source community. It implements some of the most advanced computer vision algorithms available. OpenCV 2.x was installed onto the Debian image directly from the apt repositories with the following command:
+Sudo apt-get install opencvblahblah
+GoProHero 
+The Hero3+ camera is controlled by connecting to its Ad Hoc network on the camera itself. To interface to the camera an open source tool, GoProHero, was used. It is available on github and to install version <blah> the following commands were issued:
+
+
+\section*{Results}
+
+\subsection*{Target Identification with Thresholding}
+Thresholding is the simplest way to track an object. It works in scenarios where the relative brightness of an object is unique in the scene. The LEDs used for identification where purposely selected to allow for just this case. OpenCV is used to perform a thresholding operation, masking out all other areas of the image whose brightness is less than the thresholded value. Once this is done then the openCV command <blah> is used to find connected regions. Since only the LEDs should be left in the image it should also be the only regions identified. The number of regions identified is the target ID. Since 4 LEDs are used for identification, but 2 are needed to be active for centering of the image, a total of 3 targets can be identified using this method.
+%<Images and Masks>
+Target Centering
+The centroid of the identified region is found by using <blah command>. Based on the ID of the target, the center of these regions is calculated and subtracted from the center of the image. An additional offset is applied, to allow for calibration of the laser and detector positions. This offset is fed into the motor control laws and the process is repeated until the image is centered.
+%<image of centroid and line to center of image>
+%<code snippet>
+Laser Alignment
+Centering of the target will move the laser close to the photodetector but will probably not strike close enough to activate it. Therefor a Laser Alignment stage is necessary. At this stage the Signal Good LED will be searched for. It should be above the ID LEDs and will also be detectable with thresholding. If the LED is not illuminated then a small random offset will be applied to the center of the image. Once the Gimbal has moved the image to the new target center the LED is checked again. This process is repeated until the LED turns on.  At this point the message is sent across the laser to the target.
+%<Images of Signal Good and Mask>
+
+
+
+\section*{Future Work} \label{sec:Future Work}
+
+
+\bibliographystyle{IEEEtran}
+\bibliography{ref_paul}
+
+\end{document}
