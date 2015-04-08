@@ -9,6 +9,8 @@ from goprohero import GoProHero
 import time
 import os
 import matplotlib.pyplot as plt
+
+cmdCount = 0
 	
 def drawAxis(aframe):
 
@@ -29,6 +31,9 @@ def rotate90(img):
 	return rotated
 
 def controlLaw( x,y, refx, refy ):
+
+	global cmdCount
+
 	print "X:",x,"  Ref:",refx
 	k = .15 
 	spd = -k * (  refx - x )
@@ -36,7 +41,8 @@ def controlLaw( x,y, refx, refy ):
 		spdString = "   %s" % spd 
 	else:
 		spdString = "   +%s" % spd
-	print "Loc:",x,"   String:",spdString
+	cmdCount = cmdCount + 1
+	print "[" + str(cmdCount) + "]Loc:",x,"   String:",spdString
 	os.system("echo '%s' > /dev/ttyUSB0" % spdString)
 	xVals.append(x)
 	yVals.append(y)
@@ -52,14 +58,16 @@ def getFrame():
 	#rotframe = rotate90(frame)
 	return rotframe
 
+
 def findTheDot(theframe):
 	greenF = frame[:,:,1]	
 	#imgray = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY)
 	
-	_, thresh = cv2.threshold(greenF, 225, 255, cv2.THRESH_BINARY)
+	_, thresh = cv2.threshold(greenF, 254, 255, cv2.THRESH_BINARY)
 	
 	ctrs, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	cv2.drawContours(thresh, ctrs, -1, (255, 255, 255), 3)
+	cv2.imshow('green', greenF)
 	cv2.imshow('threshold',thresh)
 	return ctrs
 
@@ -102,11 +110,16 @@ def plotVals(xvals, yvals, xref, yref):
 	legend = ax.legend(loc = 'center left', bbox_to_anchor = (1,.5))
 	plt.show()
 
+def drawTrackingCircle(frame, cX, cY):
+	cv2.circle(frame, (cX, cY), 10, [255,255,255], 4)
+
 camera = GoProHero(password='rafadrone')
 camera.command('fov','90')
 #camera.command('mode','still')
 camera.command('picres','12MP wide')
 #camera.command('record','off')
+
+fgbg = cv2.BackgroundSubtractorMOG()
 
 f = open('logfile.txt','w')
 
@@ -117,8 +130,14 @@ xVals = []
 yVals = []
 
 
-while repeats < 10:
+while repeats < 1000:
 	frame = getFrame()
+
+	fgMask = fgbg.apply(frame)
+	cv2.imshow('fg mask', fgMask)
+	masked = cv2.bitwise_and(frame, frame, mask = fgMask)
+	cv2.imshow('result', masked)
+
 
 	h, w = frame.shape[:2]
 	refX = w/2
@@ -143,6 +162,7 @@ while repeats < 10:
 	
 
 	drawAxis(frame)	
+	drawTrackingCircle(frame, centerX, centerY)
 	cv2.imshow('frame', frame)
 	cv2.waitKey(1)
 
