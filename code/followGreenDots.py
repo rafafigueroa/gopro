@@ -54,24 +54,27 @@ def controlLaw( x,y, refx, refy ):
 
 def getFrame():
 	_,img = cap.read();
-	#cimg = np.array(pilImg) 
 	rotframe = rotate90(img)
 	
-	#frame = np.array(pilImage)
-	#rotframe = rotate90(frame)
 	return rotframe
 
 
 def findTheDot(theframe):
 	greenF = frame[:,:,1]	
 	#imgray = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY)
+	#Threshold the green channel (use HSV later...)	
+	_, thresh = cv2.threshold(greenF, 250, 255, cv2.THRESH_BINARY)
 	
-	_, thresh = cv2.threshold(greenF, 254, 255, cv2.THRESH_BINARY)
+	# Clean up the image a bit before looking for contours...
+	kernel = np.ones((2,2),np.uint8)
+	img1 = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+	cleanImage = cv2.morphologyEx(img1, cv2.MORPH_CLOSE, kernel)
 	
-	ctrs, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-	cv2.drawContours(thresh, ctrs, -1, (255, 255, 255), 3)
-	#cv2.imshow('green', greenF)
-	cv2.imshow('threshold',thresh)
+	
+	ctrs, hier = cv2.findContours(cleanImage, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+	cv2.drawContours(cleanImage, ctrs, -1, (255, 255, 255), 3)
+	cv2.imshow('Cleaned',cleanImage)
+	cv2.imshow('Threshed', thresh)
 	return ctrs
 
 def findCenter(contours):
@@ -116,14 +119,9 @@ def plotVals(xvals, yvals, xref, yref):
 def drawTrackingCircle(frame, cX, cY):
 	cv2.circle(frame, (cX, cY), 10, [255,255,255], 4)
 
-#camera = GoProHero(password='rafadrone')
-#camera.command('fov','90')
-#camera.command('mode','still')
-#camera.command('picres','12MP wide')
-#camera.command('record','off')
 cap = cv2.VideoCapture(1)
 
-fgbg = cv2.BackgroundSubtractorMOG()
+#fgbg = cv2.BackgroundSubtractorMOG()
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect((HOST, PORT))
 f = open('logfile.txt','w')
@@ -145,7 +143,7 @@ while True:
 
 
 	h, w = frame.shape[:2]
-	refX = 310 #w/2
+	refX = 290 #w/2
 	refY = h/2 
 	ctrs = findTheDot(frame)
 
@@ -165,7 +163,6 @@ while True:
 			lastY = centerY
 			repeats = 0
 	
-
 	drawAxis(frame)	
 	drawTrackingCircle(frame, centerX, centerY)
 	cv2.imshow('frame', frame)
