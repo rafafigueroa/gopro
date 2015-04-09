@@ -1,0 +1,6 @@
+1st turtlebot: 10.1.1.119
+roslaunch turtlebot_bringup minimal.launch
+source ~/msproject/amrws/devel/setup.bash
+rosrun amrpkg odom_control.py
+rostopic list
+

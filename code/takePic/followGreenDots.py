@@ -1,26 +1,19 @@
 from __future__ import division
-#import base64
+import base64
 import numpy as np
 import cv2
 import cv
 from PIL import Image
 import StringIO
-#from goprohero import GoProHero
+from goprohero import GoProHero
 import time
 import os
 import matplotlib.pyplot as plt
-import socket
-
-HOST = '10.1.1.128'
-PORT = 50017
-
 
 cmdCount = 0
 	
 def drawAxis(aframe):
 
-	#h = 480
-	#w = 640
 	h,w = aframe.shape[:2]
 	h2 = int(h/2)
 	w2 = int(w/2)
@@ -33,28 +26,31 @@ def rotate90(img):
 
 	(h, w) = img.shape[:2]
 	center = (w/2, h/2)
-	M = cv2.getRotationMatrix2D(center, 90, 1.0)
+	M = cv2.getRotationMatrix2D(center, -90, 1.0)
 	rotated = cv2.warpAffine(img, M, (w,h))
 	return rotated
 
 def controlLaw( x,y, refx, refy ):
 
 	global cmdCount
-	global s
+
+	print "X:",x,"  Ref:",refx
 	k = .15 
 	spd = -k * (  refx - x )
-	
-	print "X:",x,"  Ref:",refx, "   Speed:",spd
-
+	if spd < 0:
+		spdString = "   %s" % spd 
+	else:
+		spdString = "   +%s" % spd
 	cmdCount = cmdCount + 1
-	s.sendall(str(spd))
+	print "[" + str(cmdCount) + "]Loc:",x,"   String:",spdString
+	os.system("echo '%s' > /dev/ttyUSB0" % spdString)
 	xVals.append(x)
 	yVals.append(y)
 	logStr = "X Actual: " + str(x) + "X Reference: " + str(refx) + "\n"
 	f.write(logStr)
 
 def getFrame():
-	_,img = cap.read();
+	img = camera.imageRaw();
 	#cimg = np.array(pilImg) 
 	rotframe = rotate90(img)
 	
@@ -71,7 +67,7 @@ def findTheDot(theframe):
 	
 	ctrs, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 	cv2.drawContours(thresh, ctrs, -1, (255, 255, 255), 3)
-	#cv2.imshow('green', greenF)
+	cv2.imshow('green', greenF)
 	cv2.imshow('threshold',thresh)
 	return ctrs
 
@@ -117,16 +113,14 @@ def plotVals(xvals, yvals, xref, yref):
 def drawTrackingCircle(frame, cX, cY):
 	cv2.circle(frame, (cX, cY), 10, [255,255,255], 4)
 
-#camera = GoProHero(password='rafadrone')
-#camera.command('fov','90')
+camera = GoProHero(password='rafadrone')
+camera.command('fov','90')
 #camera.command('mode','still')
-#camera.command('picres','12MP wide')
+camera.command('picres','12MP wide')
 #camera.command('record','off')
-cap = cv2.VideoCapture(1)
 
 fgbg = cv2.BackgroundSubtractorMOG()
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
+
 f = open('logfile.txt','w')
 
 lastX = 0
@@ -137,16 +131,21 @@ yVals = []
 
 
 while repeats < 1000:
-	frame = getFrame()
+	frame = camera.imageRaw()
+	#frame = getFrame()
+	cv2.imwrite("greenDot.jpg",frame)
+	cv2.imshow("frame", frame)
+	cv2.waitKey(0)
+	exit()
 
-	#fgMask = fgbg.apply(frame)
-	#cv2.imshow('fg mask', fgMask)
-	#masked = cv2.bitwise_and(frame, frame, mask = fgMask)
-	#cv2.imshow('result', masked)
+	fgMask = fgbg.apply(frame)
+	cv2.imshow('fg mask', fgMask)
+	masked = cv2.bitwise_and(frame, frame, mask = fgMask)
+	cv2.imshow('result', masked)
 
 
 	h, w = frame.shape[:2]
-	refX = 310 #w/2
+	refX = w/2
 	refY = h/2 
 	ctrs = findTheDot(frame)
 
