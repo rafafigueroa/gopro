@@ -14,7 +14,6 @@ import socket
 HOST = '10.1.1.128'
 PORT = 50017
 
-
 cmdCount = 0
 	
 def drawAxis(aframe):
@@ -136,7 +135,7 @@ xVals = []
 yVals = []
 
 
-while repeats < 1000:
+while True:
 	frame = getFrame()
 
 	#fgMask = fgbg.apply(frame)
@@ -170,7 +169,9 @@ while repeats < 1000:
 	drawAxis(frame)	
 	drawTrackingCircle(frame, centerX, centerY)
 	cv2.imshow('frame', frame)
-	cv2.waitKey(1)
+	ch = cv2.waitKey(1)
+	if ch == 'q':
+		break
 
 plotVals(xVals, yVals, w/2, h/2)
 
