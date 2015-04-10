@@ -1,18 +1,19 @@
 from __future__ import division
-#import base64
 import numpy as np
 import cv2
 import cv
 from PIL import Image
 import StringIO
-#from goprohero import GoProHero
 import time
 import os
 import matplotlib.pyplot as plt
 import socket
 
+from blobDetect import getContours 
+import findTarget
+
 HOST = '10.1.1.128'
-PORT = 50017
+PORT = 50007
 
 cmdCount = 0
 	
@@ -36,70 +37,52 @@ def rotate90(img):
 	rotated = cv2.warpAffine(img, M, (w,h))
 	return rotated
 
+def motorTurn(degrees):
+	global edi 
+
+	if degrees < 0:
+		degrees = -degrees
+		mOnDelay = int((degrees / 400) * 1000.0) 
+		if mOnDelay > 999:
+			mOnDelay = 999
+		cmdString = "{:+4},{:+4},{:3}".format(int(-30),0,int(mOnDelay))
+	else:
+		mOnDelay = int((degrees / 400) * 1000.0) 
+		if mOnDelay > 999:
+			mOnDelay = 999
+		cmdString = "{:+4},{:+4},{:3}".format(int(30),0,int(mOnDelay))
+
+	print "Rotating " + str(degrees) + " by " + str(mOnDelay) + "mSecs"
+
+	edi.sendall(cmdString)
+	cv2.waitKey(50)
+
 def controlLaw( x,y, refx, refy ):
 
 	global cmdCount
-	global s
+	global edi 
 	k = .15 
 	spd = -k * (  refx - x )
 	
 	print "X:",x,"  Ref:",refx, "   Speed:",spd
 
 	cmdCount = cmdCount + 1
-	s.sendall(str(spd))
+	cmdString = "{:+4},{:+4},{:3}".format(int(spd), 0, 35)
+	print "Cmd String: " + cmdString
+	edi.sendall(cmdString)
 	xVals.append(x)
 	yVals.append(y)
 	logStr = "X Actual: " + str(x) + "X Reference: " + str(refx) + "\n"
-	f.write(logStr)
+	#f.write(logStr)
+	#time.sleep(.003) #Give Edison time to issue motor commands
 
 def getFrame():
 	_,img = cap.read();
-	#cimg = np.array(pilImg) 
+	_,img = cap.read();
+	_,img = cap.read();
 	rotframe = rotate90(img)
-	
-	#frame = np.array(pilImage)
-	#rotframe = rotate90(frame)
-	return rotframe
-
-
-def findTheDot(theframe):
-	greenF = frame[:,:,1]	
-	#imgray = cv2.cvtColor( frame, cv2.COLOR_BGR2GRAY)
-	
-	_, thresh = cv2.threshold(greenF, 254, 255, cv2.THRESH_BINARY)
-	
-	ctrs, hier = cv2.findContours(thresh, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-	cv2.drawContours(thresh, ctrs, -1, (255, 255, 255), 3)
-	#cv2.imshow('green', greenF)
-	cv2.imshow('threshold',thresh)
-	return ctrs
-
-def findCenter(contours):
-
-	if len(contours) <= 1:
-		print "2 Contours not found!"
-		return -1000, -1000;	
-	
-	M1 = cv2.moments(ctrs[0])
-	M2 = cv2.moments(ctrs[1])
-
-	if M1['m00'] != 0:
-		cntX1 = int(M1['m10']/M1['m00'])
-		cntY1 = int(M1['m01']/M1['m00'])
-	else:
-		cntX1 = ctrs[0][0][0][0]
-		cntY1 = ctrs[0][0][0][1]
-	if M2['m00'] != 0:
-		cntX2 = int(M2['m10']/M2['m00'])
-		cntY2 = int(M2['m01']/M2['m00'])
-	else:
-		cntX2 = ctrs[1][0][0][0]
-		cntY2 = ctrs[1][0][0][1]
-
-	centerX = abs(int((cntX2 - cntX1) / 2)) + min(cntX1, cntX2)
-	centerY = abs(int((cntY2 - cntY1) / 2)) + min(cntY1, cntY2)
-	print "CX: ", centerX, "CY: ", centerY
-	return centerX, centerY
+	bwframe = cv2.cvtColor(rotframe, cv2.COLOR_BGR2GRAY)
+	return rotframe, bwframe
 
 def plotVals(xvals, yvals, xref, yref):
 
@@ -116,17 +99,49 @@ def plotVals(xvals, yvals, xref, yref):
 def drawTrackingCircle(frame, cX, cY):
 	cv2.circle(frame, (cX, cY), 10, [255,255,255], 4)
 
-#camera = GoProHero(password='rafadrone')
-#camera.command('fov','90')
-#camera.command('mode','still')
-#camera.command('picres','12MP wide')
-#camera.command('record','off')
-cap = cv2.VideoCapture(1)
+def initTarget2():
+	findTarget.initFindTarget()
+	img = []
+	target = []
 
-fgbg = cv2.BackgroundSubtractorMOG()
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.connect((HOST, PORT))
-f = open('logfile.txt','w')
+	imgBase = cv2.imread("n2Front.jpg",cv2.IMREAD_GRAYSCALE)
+	kpB, dB = findTarget.getKPAndDesc( imgBase )
+	
+	return kpB, dB, imgBase
+
+def coerceToRange(val, minV, maxV):
+	if val < minV:
+		return minV
+	if val > maxV:
+		return maxV
+	return val
+
+def centerTarget( kpB, dB, imgB, cX, cY):
+	print "Found, centering..."
+	h = 320
+	w = 640
+	rX = w/2
+	rY = h/2
+
+	while abs(cX - rX) > 60:
+		mv = cX - rX
+		if mv < 0:
+			motorTurn( -15 )
+		else:
+			motorTurn( 15 )
+		frame, bwframe = getFrame()
+		found, corners, centerX, centerY = findTarget.findTarget(kpB, dB, imgB, bwframe)
+		if found == False:
+			print "Lost Target!"
+			return False
+	return True
+
+	
+		
+cap = cv2.VideoCapture(1)
+edi = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+edi.connect((HOST, PORT))
+#f = open('logfile.txt','w')
 
 lastX = 0
 lastY = 0
@@ -134,44 +149,64 @@ repeats = 0
 xVals = [] 
 yVals = []
 
-
+kpB, dB, imgB = initTarget2()
+ROIx1 = 0
+ROIx2 = 480
+ROIy1 = 0
+ROIy2 = 640
 while True:
-	frame = getFrame()
-
-	#fgMask = fgbg.apply(frame)
-	#cv2.imshow('fg mask', fgMask)
-	#masked = cv2.bitwise_and(frame, frame, mask = fgMask)
-	#cv2.imshow('result', masked)
-
-
+	frame,bwframe = getFrame()
 	h, w = frame.shape[:2]
 	refX = 310 #w/2
-	refY = h/2 
-	ctrs = findTheDot(frame)
+	refY = h/2
 
-	centerX, centerY = findCenter(ctrs)	
-	if centerX != -1000:
-		controlLaw(centerX, centerY, refX, refY)
+	#First try to find the target in the frame...
 
-		if centerX == lastX:
-			repeats = repeats + 1
-		else:
-			lastX = centerX
-			repeats = 0
+	#roiFrame = bwframe[ ROIy1:ROIy2, ROIx1:ROIx2]
+	#cv2.imshow("ROI", roiFrame)
 
-		if centerY == lastY:
-			repeats = repeats + 1
-		else:
-			lastY = centerY
-			repeats = 0
+	found, corners, centerX, centerY = findTarget.findTarget(kpB, dB, imgB, bwframe)
+	if found == True:
+		#cv2.polylines(frame,[corners], True, (255,255,255))
+		#The target has been located.
+		#Try to center the target
+		if centerTarget(kpB, dB, imgB, centerX, centerY) == True:
+			#Fine control.
+			print "Fine control!"
+			print "Stopping..."
+			exit()
+	else: 
+		print "Looking for target..."
+		motorTurn(25)
+		
+
+
+
+	#	centerX = centerX + ROIx1
+	#	centerY = centerY + ROIy1
+	#	print "Corners:"
+	#	print corners
+	#	print "Center:"
+	#	print centerX, centerY
 	
+		#ROIx1 = corners[0][0] - 25
+		#ROIy1 = corners[0][1] - 25
+		#ROIx2 = corners[2][0] + 25
+		#ROIy2 = corners[2][1] + 25
+	#	print "Next ROI:[" + str(ROIx1) + "," + str(ROIy1) + "],[" + str(ROIx2) + "," + str(ROIy2)+ "]"
+		#ROIx1 = coerceToRange(ROIx1, 0, w)
+		#ROIx2 = coerceToRange(ROIx2, 0, w)
+		#ROIy1 = coerceToRange(ROIy1, 0, h)
+		#ROIy2 = coerceToRange(ROIy2, 0, h)
+	#	print corners
+	
+		#cv2.polylines(frame, [corners], True, (255, 255, 255))	
+		#drawTrackingCircle(frame, centerX, centerY)
+		#controlLaw(centerX, centerY, refX, refY)
 
 	drawAxis(frame)	
-	drawTrackingCircle(frame, centerX, centerY)
 	cv2.imshow('frame', frame)
-	ch = cv2.waitKey(1)
-	if ch == 'q':
-		break
+	cv2.waitKey(10)
 
 plotVals(xVals, yVals, w/2, h/2)
 
