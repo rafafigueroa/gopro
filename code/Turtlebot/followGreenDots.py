@@ -1,26 +1,28 @@
 from __future__ import division
 import numpy as np
 import cv2
-import cv
-from PIL import Image
-import StringIO
 import time
 import os
 import matplotlib.pyplot as plt
 import socket
+import math
 
 from blobDetect import getContours 
 import findTarget
 
-HOST = '10.1.1.128'
-PORT = 50007
+HOST = 'Edison'
+PORT = 50005
 
 cmdCount = 0
+
+def setExposure(exposure):
+        #print "Setting Exposure to " + str(exposure)
+        setExp = "camControl/setExposure " + str(exposure)
+        os.system(setExp)
+
 	
 def drawAxis(aframe):
 
-	#h = 480
-	#w = 640
 	h,w = aframe.shape[:2]
 	h2 = int(h/2)
 	w2 = int(w/2)
@@ -37,52 +39,46 @@ def rotate90(img):
 	rotated = cv2.warpAffine(img, M, (w,h))
 	return rotated
 
-def motorTurn(degrees):
-	global edi 
+def motorTurn():
+    global edi 
 
-	if degrees < 0:
-		degrees = -degrees
-		mOnDelay = int((degrees / 400) * 1000.0) 
-		if mOnDelay > 999:
-			mOnDelay = 999
-		cmdString = "{:+4},{:+4},{:3}".format(int(-30),0,int(mOnDelay))
-	else:
-		mOnDelay = int((degrees / 400) * 1000.0) 
-		if mOnDelay > 999:
-			mOnDelay = 999
-		cmdString = "{:+4},{:+4},{:3}".format(int(30),0,int(mOnDelay))
-
-	print "Rotating " + str(degrees) + " by " + str(mOnDelay) + "mSecs"
-
-	edi.sendall(cmdString)
-	cv2.waitKey(50)
+    cmdString = "{:+4},{:+4},{:3}\n".format(int(-30),0,int(150))
+    #edi.sendall(cmdString)
+    cv2.waitKey(50)
 
 def controlLaw( x,y, refx, refy ):
 
-	global cmdCount
-	global edi 
-	k = .15 
-	spd = -k * (  refx - x )
-	
-	print "X:",x,"  Ref:",refx, "   Speed:",spd
+    global cmdCount
+    global edi 
+    k = .25
 
-	cmdCount = cmdCount + 1
-	cmdString = "{:+4},{:+4},{:3}".format(int(spd), 0, 35)
-	print "Cmd String: " + cmdString
-	edi.sendall(cmdString)
-	xVals.append(x)
-	yVals.append(y)
-	logStr = "X Actual: " + str(x) + "X Reference: " + str(refx) + "\n"
-	#f.write(logStr)
-	#time.sleep(.003) #Give Edison time to issue motor commands
+    spd = -k * (  refx - x )
 
-def getFrame():
-	_,img = cap.read();
-	_,img = cap.read();
-	_,img = cap.read();
-	rotframe = rotate90(img)
-	bwframe = cv2.cvtColor(rotframe, cv2.COLOR_BGR2GRAY)
-	return rotframe, bwframe
+    print "X:",x,"Y: ",y,"  Ref:",refx, "   Speed:",spd
+
+    cmdCount = cmdCount + 1
+    cmdString = "{:+4},{:+4},{:3}\n".format(int(spd), 0, 35)
+    print "Cmd String: " + cmdString
+    #edi.sendall(cmdString)
+    xVals.append(x)
+    yVals.append(y)
+    logStr = "X Actual: " + str(x) + "X Reference: " + str(refx) + "\n"
+    #f.write(logStr)
+    time.sleep(.025) #Give Edison time to issue motor commands
+
+def getFrame(cap, skip):
+
+    setExposure(200)
+    for i in range(skip):
+        _,img2 = cap.read()
+    setExposure(160)
+    for i in range(skip):
+        _,img = cap.read()
+    _, img = cap.read()
+    workframe = rotate90(img)
+    visframe  = rotate90(img2)
+
+    return workframe, visframe 
 
 def plotVals(xvals, yvals, xref, yref):
 
@@ -99,16 +95,6 @@ def plotVals(xvals, yvals, xref, yref):
 def drawTrackingCircle(frame, cX, cY):
 	cv2.circle(frame, (cX, cY), 10, [255,255,255], 4)
 
-def initTarget2():
-	findTarget.initFindTarget()
-	img = []
-	target = []
-
-	imgBase = cv2.imread("n2Front.jpg",cv2.IMREAD_GRAYSCALE)
-	kpB, dB = findTarget.getKPAndDesc( imgBase )
-	
-	return kpB, dB, imgBase
-
 def coerceToRange(val, minV, maxV):
 	if val < minV:
 		return minV
@@ -116,27 +102,119 @@ def coerceToRange(val, minV, maxV):
 		return maxV
 	return val
 
-def centerTarget( kpB, dB, imgB, cX, cY):
-	print "Found, centering..."
-	h = 320
-	w = 640
-	rX = w/2
-	rY = h/2
+def lineProperties(centers):
 
-	while abs(cX - rX) > 60:
-		mv = cX - rX
-		if mv < 0:
-			motorTurn( -15 )
-		else:
-			motorTurn( 15 )
-		frame, bwframe = getFrame()
-		found, corners, centerX, centerY = findTarget.findTarget(kpB, dB, imgB, bwframe)
-		if found == False:
-			print "Lost Target!"
-			return False
-	return True
+    x = centers[1][0] - centers[0][0]
+    y = centers[0][1] - centers[1][1]
 
-	
+    print "x: " + str(x) + "  y:" + str(y)
+    llen = math.sqrt(x**2 + y**2)
+    if (llen == 0):
+        return 0,0,0
+    ang = math.asin(y/llen)
+    print "Angle: " + str(ang) + " Length:" + str(llen)
+    print "Inches to Pixels:" + str(llen / .75)
+    return ang, llen, llen / .75
+
+def locateTarget(cap):
+
+    spotted = 0
+    notSpotted = 0
+    pi = math.pi
+
+    while (spotted < 3):
+        img, vis = getFrame(cap, 15)
+        contours = findTarget.findTarget(img)
+        centers = findTarget.findCentroids(contours)
+        if len(centers) == 2:
+            ang, llen,_ = lineProperties(centers)
+            print "Possible Target sighted!"
+            if abs(ang) > .600 and abs(ang) < 1.00:
+               print "Angle within limits..."
+               spotted = spotted + 1
+               notSpotted = 0
+            else:
+                print "Rejected:" + str(ang)
+                notSpotted = notSpotted + 1
+                spotted = 0
+        else:
+            print "Target not sighted!"
+            spotted = 0
+            notSpotted = notSpotted + 1
+        if notSpotted >= 3:
+            print "Looking elsewhere..."
+            motorTurn()
+            notSpotted = 0
+            spotted = 0
+
+def calibration(cap):
+
+    calibrationX = 1
+    _, vis = getFrame(cap, 5)
+    cv2.imshow("Calibration", vis)
+    while True:
+        print "Align, press a key..."
+        cv2.waitKey(0)
+        img, vis = getFrame(cap, 15)
+        cv2.imshow("Calibration", vis)
+        contours = findTarget.findTarget(img)
+        centers = findTarget.findCentroids(contours)
+             
+        if len(centers) == 2:	
+            _,_,cvt = lineProperties(centers)
+            cX = (centers[0][0] + centers[1][0]) / 2
+            cY = (centers[0][1] + centers[1][1]) / 2
+
+            
+
+            print "Old: " + str(calibrationX) + " Error: " + str(320 - (calibrationX * cvt) - cX)
+            calibrationX = (320 - cX) / cvt
+            print "New Calibration: " + str(calibrationX) + "  New Error: " + str( 320 - (calibrationX * cvt) - cX)
+
+
+
+def alignLaser(cap):
+
+    print "Aligning Laser"
+    cX = 0
+    refX = 290 
+    refY = 192 
+    notDone = False
+    aligned = 0
+    while aligned < 3:
+        if (abs(cX - refX) < 3 ): 
+            aligned = aligned + 1
+        else:
+            aligned = 0
+        img, vis = getFrame(cap, 15)	
+        contours = findTarget.findTarget(img)
+        centers = findTarget.findCentroids(contours)
+        if len(centers) == 1:
+            print "One dot!"
+            cX = centers[0][0]
+            cY = centers[0][1]
+            drawTrackingCircle(img, int(cX), int(cY))
+            cv2.imshow("frame", img)
+            cv2.waitKey(1)
+            controlLaw(cX, cY, refX, refY)
+        if len(centers) == 2:	
+            _,_,cvt = lineProperties(centers)
+            cX = (centers[0][0] + centers[1][0]) / 2
+            cY = (centers[0][1] + centers[1][1]) / 2 
+    
+            #refX = int( 320 - (calibrationX * cvt ))
+            #refY = int( cY - ( 3.3 * cvt) ) 
+
+
+            drawTrackingCircle(vis,int(cX),int(cY))
+            #drawTrackingCircle(vis,refX, refY) 
+            drawAxis(vis)
+            cv2.imshow("frame", vis)
+            cv2.waitKey(1)
+            controlLaw(cX, cY, refX, refY)
+        else:
+            print "Not enough centers:" + str(centers)
+            
 		
 cap = cv2.VideoCapture(1)
 edi = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -148,65 +226,22 @@ lastY = 0
 repeats = 0
 xVals = [] 
 yVals = []
+calibrationX = 1.7 # Inches from center
 
-kpB, dB, imgB = initTarget2()
-ROIx1 = 0
-ROIx2 = 480
-ROIy1 = 0
-ROIy2 = 640
-while True:
-	frame,bwframe = getFrame()
-	h, w = frame.shape[:2]
-	refX = 310 #w/2
-	refY = h/2
+#calibration(cap)
+setExposure(200)
+#    h, w = frame.shape[:2]
+refX = 310 #w/2
+    #refY = h/2
 
-	#First try to find the target in the frame...
+locateTarget(cap)
+print "Target found! Aligning laser!"
 
-	#roiFrame = bwframe[ ROIy1:ROIy2, ROIx1:ROIx2]
-	#cv2.imshow("ROI", roiFrame)
+alignLaser(cap)
+    #First try to find the target in the frame...
 
-	found, corners, centerX, centerY = findTarget.findTarget(kpB, dB, imgB, bwframe)
-	if found == True:
-		#cv2.polylines(frame,[corners], True, (255,255,255))
-		#The target has been located.
-		#Try to center the target
-		if centerTarget(kpB, dB, imgB, centerX, centerY) == True:
-			#Fine control.
-			print "Fine control!"
-			print "Stopping..."
-			exit()
-	else: 
-		print "Looking for target..."
-		motorTurn(25)
-		
-
-
-
-	#	centerX = centerX + ROIx1
-	#	centerY = centerY + ROIy1
-	#	print "Corners:"
-	#	print corners
-	#	print "Center:"
-	#	print centerX, centerY
-	
-		#ROIx1 = corners[0][0] - 25
-		#ROIy1 = corners[0][1] - 25
-		#ROIx2 = corners[2][0] + 25
-		#ROIy2 = corners[2][1] + 25
-	#	print "Next ROI:[" + str(ROIx1) + "," + str(ROIy1) + "],[" + str(ROIx2) + "," + str(ROIy2)+ "]"
-		#ROIx1 = coerceToRange(ROIx1, 0, w)
-		#ROIx2 = coerceToRange(ROIx2, 0, w)
-		#ROIy1 = coerceToRange(ROIy1, 0, h)
-		#ROIy2 = coerceToRange(ROIy2, 0, h)
-	#	print corners
-	
-		#cv2.polylines(frame, [corners], True, (255, 255, 255))	
-		#drawTrackingCircle(frame, centerX, centerY)
-		#controlLaw(centerX, centerY, refX, refY)
-
-	drawAxis(frame)	
-	cv2.imshow('frame', frame)
-	cv2.waitKey(10)
+print "Finished!"
+cv2.waitKey(0)
 
 plotVals(xVals, yVals, w/2, h/2)
 
