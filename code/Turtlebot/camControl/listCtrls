@@ -1,0 +1,2 @@
+v4l2-ctl --device=1 --list-ctrls
+
