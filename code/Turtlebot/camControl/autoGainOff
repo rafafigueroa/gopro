@@ -1,0 +1,1 @@
+v4l2-ctl --device=1 --set-ctrl gain_automatic=0
