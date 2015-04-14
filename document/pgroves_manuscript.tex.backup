@@ -70,7 +70,7 @@ A laser communication module will consist of the following components:
  \item Laser sensor.
  \item Laser and laser driver circuit.
  \item Camera.
- \item Alignment actuators.
+ \item Alignment actuators (motors and motor drivers).
 \end{itemize}
 
 Only the first two items will be required regardless of robot size. Each robot capable of sending a message will have the laser and camera mounted on an actuated gimbal in order to find and track the target module without affecting the sender robot current trajectory or mission.
@@ -112,10 +112,17 @@ The message is sent using the laser-sensor pair. Once properly aligned and start
 
 After the message is received, the target robot acknowledges by using the wireless network and the robots continue with their mission.
 
-\section*{Prototype Hardware}\label{chp:}
+\section*{Prototype Hardware Overview}\label{chp:}
+
+\begin{figure}[ht]
+ \begin{center}
+  \includegraphics[width=0.7\textwidth]{figures/SystemDiagram.eps}
+  \caption{\small \label{fig:system_diagram} Hardware Overview Diagram}
+ \end{center}
+\end{figure}
 
 \section*{Agent}
-The agent current is a TurtleBot. The interface to the laser communication module is through the USB port on the TurtleBot computer. Power is provided in the base of the TurtleBot at 12 Volts DC, separate regulators are used to provide power to the various modules. 
+The current agent is a TurtleBot. Power is provided in the base of the TurtleBot at 12 Volts DC, separate regulators are used to provide power to the various modules. 
 
 \begin{figure}[ht]
  \begin{center}
@@ -151,7 +158,7 @@ The laser sensor is based on a photodiode. It was selected to match the waveleng
 The output from the OpAmp goes directly to the MCU. The voltage level is selectable by the pullup voltage at the output pin.
 
 \subsection*{Camera}
-The camera being used for development is a GoPro Hero3+. It is a Wifi camera capable of full HDMI resolution with a 90 FOV. 
+The two cameras used for development are is a GoPro Hero3+ and Logitech Pro USB. The GoPro Hero3+ It is a Wifi camera capable of full HDMI resolution with a 90 FOV. 
 
 \section*{System Configuration}
 
@@ -159,12 +166,14 @@ The camera being used for development is a GoPro Hero3+. It is a Wifi camera cap
 The Edison operates on a Debian 3.2 Headless kernel built from the Yocto project. It includes special libraries from Intel to support access to the extra features of the platform, such as GPIO ports and ADC ports. 
 
 \subsection*{Development Environment}
-Main developing was done in Python and C. Python 2.7 was used in this project. The Python libraries were used:
+Main developing was done in Python and C. Python 2.7 was used in this project. The Python libraries used included:
 
 \subsubsection{Computer Vision: OpenCV}
-OpenCV is a mature, robust, computer vision library available to the Open Source community. It implements some of the most advanced computer vision algorithms available. OpenCV 2.x was installed onto the Debian image directly from the apt repositories with the following command:
+OpenCV is a mature, robust, computer vision library available to the Open Source community. It implements some of the most advanced computer vision algorithms available. OpenCV 2.x was installed onto the Debian image directly from the apt repositories.
 \subsubsection{Camera Driver: GoProHero}
 The Hero3+ camera is controlled by connecting to its Ad Hoc network on the camera itself. To interface to the camera an open source tool, GoProHero, was used. It is available on \cite{goprohero}.
+\subsection{Camera Driver: Logitech USB}
+The Logitech USB driver was built into the standard V4L2 linux drivers. The camera was controlled by the v4l2-ctl utility and images were captured directly in OpenCV.
 \subsubsection{Math: NumPy}
 Allows scientific computing and matrix operations.
 
@@ -174,7 +183,7 @@ The algorithm under design needs to accomplish several tasks. It must identify a
 
 \subsection*{Target Acquisition Algorithm}
 
-When operating, images are captured every 250 ms. They are transmitted by the GoPro as a Base64 encoded string. This string is decoded into binary values and put into a NumPy array. This array is converted to HSV values and image correction is applied to correct for image aberrations from the GoPro camera. OpenCV's built in Sift algorithm is used to search for the target agent. Once identified a region of interest is created around the detected agent. The distance between the center of the image and the detected agent is used as an error term for the gimbal control. Once this error approaches zero the image is monitored for the signal strength visual feedback LED. A small error around the central region, in the form of a Levy Walk, is used to search for the precise alignment of the laser. Once the signal strength visual feedback LED is detected, motor movement ceases. The desired message is transmitted over the UART to the Laser Encoder / Decoder board. 
+When operating, images are captured every 250 ms. They are transmitted by the GoPro as a Base64 encoded string. This string is decoded into binary values and put into a NumPy array. This array is converted to HSV values and image processing is performed. The Sift algorithm was attempted as a way of target identification but was not reliable. An alternative method was used with the Logitech USB camera. Once identified a region of interest is created around the detected agent. The distance between the center of the image and the detected agent is used as an error term for the gimbal control. Once the signal strength visual feedback LED is detected, motor movement ceases. The desired message is transmitted over the UART to the Laser Encoder / Decoder board. 
 
 \begin{figure}[ht]
  \begin{center}
@@ -203,36 +212,44 @@ When operating, images are captured every 250 ms. They are transmitted by the Go
 The error term for the control equations is derived from the camera images. Once the target is identified the distance to the center of the image is calculated and this result is converted to millimeters. Once the image is centered the Signal Good LED is monitored to determine correct alignment. A small error input is used to cause oscillation about the center of the screen until the Signal Good LED is illuminated. At this point motor movement will cease and the signal is sent. Figure \ref{fig:dot} shows the position of the current center with respect to the target position (white circle).
 
 
-\subsection*{Target Identification with Thresholding}
-Thresholding is the simplest way to track an object. It works in scenarios where the relative brightness of an object is unique in the scene. The LEDs used for identification where purposely selected to allow for just this case. OpenCV is used to perform a thresholding operation, masking out all other areas of the image whose brightness is less than the thresholded value. Once this is done then the openCV command <blah> is used to find connected regions. Since only the LEDs should be left in the image it should also be the only regions identified. The number of regions identified is the target ID. Since 4 LEDs are used for identification, but 2 are needed to be active for centering of the image, a total of 3 targets can be identified using this method.
+\subsection*{Target Identification with HSV Thresholding}
+Thresholding is the simplest way to track an object. It works in scenarios where the relative brightness of an object is unique in the scene. The LEDs used for identification where purposely selected to allow for just this case. OpenCV is used to perform a thresholding operation, masking out all other areas of the image whose brightness is less than the thresholded value. Once this is done then OpenCV is used to find connected regions. Since only the LEDs should be left in the image it should also be the only regions identified. The number of regions identified is the target ID. 
 
+Due to limitations in the available API for the GoPro Hero camera the Logitech USB was used for futher development. In figure \ref{fig:orig} the raw image from the Logitech USB camera is first converted to HSV. HSV is used as it allows for the clean seperation of the colorspace. The image is thresholded to remove non-green values. The result of this operation is shown in figure \ref{fig:hsvMasked}. Then brightness thresholding is used to further eliminate other elements in the image. 
+
+Because the GoPro Hero3+ camera performs automatic gain and white balancing this technique was not feasible when using it. The LEDs were shifted to white and were not easily isolated from the rest of the image. The automatic adjustments also made the colors in the image unreliable under repeated tests.
 \clearpage
 
 \begin{figure}[ht]
  \begin{center}
   \includegraphics[width=0.36 \textwidth]{figures/original.png}
-  \caption{\small \label{fig:dot} Raw Image before HSV thresholding (Logitech USB Camera).}
+  \caption{\small \label{fig:orig} Raw Image before HSV thresholding (Logitech USB Camera).}
+ \end{center}
+\end{figure}
+
+\begin{figure}[htb]
+ \begin{center}
+  \includegraphics[width=0.36 \textwidth]{figures/hsvmasked.png}
+  \caption{\small \label{fig:hsvMasked} Image with HSV thresholding (Logitech USB Camera).}
  \end{center}
 \end{figure}
 
 \begin{figure}[htb]
  \begin{center}
   \includegraphics[width=0.36 \textwidth]{figures/hsvThreshAndMask.png}
-  \caption{\small \label{fig:dot} Image with HSV thresholding (Logitech USB Camera).}
- \end{center}
-\end{figure}
-
-\begin{figure}[htb]
- \begin{center}
-  \includegraphics[width=0.36 \textwidth]{figures/processed.png}
-  \caption{\small \label{fig:dot} Processed Image (Logitech USB Camera).}
+  \caption{\small \label{fig:Procced} Processed Image (Logitech USB Camera).}
  \end{center}
 \end{figure}
 
 \clearpage
 
-\subsection*{Target Centering}
+
+
+\subsection*{Target Centering and Identification}
 The centroid of the identified region is found by using moments algorithm. Based on the ID of the target, the center of these regions is calculated and subtracted from the center of the image. An additional offset is applied, to allow for calibration of the laser and detector positions. This offset is fed into the motor control laws and the process is repeated until the image is centered.
+
+During this stage the target can be identified. In figure \ref{centers} the steps are shown for the target identification for this particular robot. The contours of the processed image are found and their centers are identified by the moments. The angles between the centers are used to help identify the robot. 
+
 
 \small
 \begin{figure}
@@ -256,13 +273,14 @@ The centroid of the identified region is found by using moments algorithm. Based
         \includegraphics[height=45mm]{figures/contLines.png}
         \caption{\small Moments Centers}
     \end{subfigure}
-    \caption{Image Processing Steps (Logitech USB Camera).}
+    \caption{\label{centers}Image Processing and Computer Vision Steps (Logitech USB Camera).}
 \end{figure}
 
 \subsection*{Laser Alignment}
-Centering of the target will move the laser close to the photodetector but will probably not strike close enough to activate it. Therefor a Laser Alignment stage is necessary. At this stage the Signal Good LED will be searched for. It should be above the ID LEDs and will also be detectable with thresholding. If the LED is not illuminated then a small random offset will be applied to the center of the image. Once the Gimbal has moved the image to the new target center the LED is checked again. This process is repeated until the LED turns on.  At this point the message is sent across the laser to the target.
+Centering of the target will move the laser close to the photodetector but will probably not strike close enough to activate it. Therefor a Laser Alignment stage is necessary. At this stage the Signal Good LED will be searched for. It should be above the ID LEDs and will also be detectable with thresholding. If the LED is not illuminated then a small random offset will be applied to the center of the image. Once the gimbal has moved the image to the new target center the LED is checked again. This process is repeated until the laser is aligned.  At this point the message is sent across the laser to the target.
 %<Images of Signal Good and Mask>
 
+Because the laser and the camera are not perfectly aligned a calibration procedure needed to be developed. A small application was created to automatically calibrate the offset of the image for proper laser alignment. In figure \ref{fig:precalibration} the original alignment, before calibration, is shown. The laser fails to align properly with the photodiode of the receiver. After calibration, figure \ref{fig:postcalibration}, the laser properly aligns. 
 
 \begin{figure}[ht]
  \begin{center}
@@ -279,29 +297,35 @@ Centering of the target will move the laser close to the photodetector but will 
  \end{center}
 \end{figure}
 
+The response of the GoPro Hero3+ in figure \ref{fig:goproresp} is due to latency in the images received from the GoPro Hero3+. In figure \ref{fig:logiresp} the Logitech USB response is shown. The improvement of the response is due to reduced latency of the Logitech USB.  
 \begin{figure}
   \begin{center}
     \begin{subfigure}{0.49\textwidth}
         \centering 
         \includegraphics[height=45mm]{figures/old_xpos_xref.eps}
-        \caption{\scriptsize Alignment Response (GoProHero).}
+        \caption{\label{fig:goproresp}\scriptsize Alignment Response (GoProHero).}
     \end{subfigure}\\
     \begin{subfigure}{0.49\textwidth}
         \centering 
         \includegraphics[height=45mm]{figures/alignmentTest.eps}
         \caption{\scriptsize Alignment Response (Logitech USB Camera).}
     \end{subfigure}
-    \caption{\small Alignment Response Comparison.}
+    \caption{\label{fig:logiresp}\small Alignment Response Comparison.}
   \end{center}
 \end{figure}
 
-\section*{Demo} \label{sec:Demo}
+\subsection*{ROS} \label{sec:ros}
+The Robot Operating System, or ROS, run on the Turtlebots in the \marhes lab. A demonstration of the system was designed for two the Turtlebots and appropriate nodes and topics created. In the demo a Turtlebot with a receiver only, termed the Target, is performing a mission. Another Turtlebot with the full gimbal, termed the Sender, is configured to request a secure message transfer to change the Target's mission.  Figure \ref{fig:rosgraph_full} shows the nodes and topics used by the Target. The Sender's nodes are similar. A video of the demo is available online \cite{video_demo}.
 
-A demonstration was done.. \cite{video_demo}
+\begin{figure}[ht]
+ \begin{center}
+  \includegraphics[width=0.8 \textwidth]{figures/rosgraph_full.png}
+  \caption{\small \label{fig:rosgraph} ROS Computational Nodes and Topics}
+ \end{center}
+\end{figure}
 
-\section*{Future Work} \label{sec:Future Work}
-
-
+\subsection*{Conclution}
+My key contributions show a prototype that can be made for small mobile robots using off the shelf components. The system can be reliable and robust, providing point-to-point laser communications between robots of various capabilities.  
 \bibliographystyle{IEEEtran}
 \bibliography{ref_paul}
 
